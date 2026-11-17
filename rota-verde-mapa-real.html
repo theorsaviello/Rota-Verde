@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rota Verde – mapa real</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{--bg:#fff;--panel:#fff;--ink:#202124;--mute:#5f6368;--line:#dadce0;--chip:#f1f3f4;--good:#188038;--mid:#e37400;--bad:#c5221f;--acc:#1a73e8;--sh:0 2px 8px rgba(0,0,0,.18)}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#16181b;--panel:#202124;--ink:#e8eaed;--mute:#9aa0a6;--line:#3c4043;--chip:#2d2f33;--good:#81c995;--mid:#fdd663;--bad:#f28b82;--acc:#8ab4f8;--sh:0 2px 8px rgba(0,0,0,.6)}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.4 "Google Sans","Segoe UI",Roboto,system-ui,sans-serif}
+.app{display:grid;grid-template-columns:400px 1fr;height:100%}
+aside{background:var(--panel);overflow-y:auto;padding:16px;box-shadow:var(--sh);z-index:1000}
+h1{font-size:20px;margin:0 0 2px;color:var(--good)}
+.sub{color:var(--mute);font-size:13px;margin:0 0 14px}
+.fields{display:grid;grid-template-columns:24px 1fr;gap:8px;align-items:center;background:var(--chip);padding:10px;border-radius:12px}
+.dot{width:12px;height:12px;border-radius:50%;border:3px solid var(--acc);justify-self:center}
+.pin{justify-self:center;color:var(--bad);line-height:1}
+input,select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
+.btns{display:flex;gap:8px;margin:10px 0}
+button.b{flex:1;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:8px;font:inherit;cursor:pointer}
+button.p{background:var(--acc);color:#fff;border-color:var(--acc)}
+.opts{display:flex;align-items:center;gap:8px;margin:6px 2px;color:var(--mute);font-size:13px}
+.opts select{width:auto;padding:4px 6px}
+.hint{font-size:13px;color:var(--mute);margin:8px 2px 12px}
+.sum{border-radius:12px;padding:12px 14px;background:color-mix(in srgb,var(--good) 14%,transparent);margin-bottom:12px;border-left:4px solid var(--good)}
+.sum b{color:var(--good)}
+.card{display:block;width:100%;text-align:left;font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-left-width:6px;border-radius:12px;padding:12px;margin-bottom:10px;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.card.sel{background:var(--chip);box-shadow:var(--sh)}
+.card.g{border-left-color:var(--good)}.card.m{border-left-color:var(--mid)}.card.b{border-left-color:var(--bad)}
+.top{display:flex;align-items:center;gap:10px}
+.ic{font-size:26px}.nm{font-weight:600;flex:1}
+.badge{background:var(--good);color:#fff;font-size:12px;padding:2px 8px;border-radius:99px;font-weight:600}
+.tm{font-size:18px;font-weight:600}
+.meta{color:var(--mute);font-size:13px;margin:2px 0 8px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.k{font-size:12px;color:var(--mute)}.v{font-size:17px;font-weight:600}
+.bar{height:6px;background:var(--line);border-radius:4px;margin-top:4px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:4px;transition:width .5s}
+.g .bar i{background:var(--good)}.m .bar i{background:var(--mid)}.b .bar i{background:var(--bad)}
+.save{font-size:13px;margin-top:8px;color:var(--good)}
+.foot{font-size:12px;color:var(--mute);margin-top:12px}
+.err{color:var(--bad);font-size:13px}
+#map{height:100%;min-height:0}
+.mk{width:28px;height:28px;border-radius:50%;border:3px solid #fff;color:#fff;font-weight:700;display:grid;place-items:center;box-shadow:var(--sh)}
+@media (max-width:760px){.app{grid-template-columns:1fr;grid-template-rows:42% 1fr}#map{order:-1}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside>
+ <h1>🌿 Rota Verde</h1>
+ <p class="sub">Digite endereços ou clique no mapa e compare o CO₂ de cada trajeto.</p>
+ <div class="fields">
+  <span class="dot"></span><input id="o" placeholder="Origem (endereço ou local)" aria-label="Origem">
+  <span class="pin">📍</span><input id="d" placeholder="Destino (endereço ou local)" aria-label="Destino">
+ </div>
+ <div class="btns">
+  <button class="b p" id="go">Traçar rotas</button>
+  <button class="b" id="loc" title="Usar minha localização como origem">📡 Onde estou</button>
+  <button class="b" id="sw" title="Inverter">⇅</button>
+ </div>
+ <div class="opts"><label for="occ">Pessoas no carro:</label>
+  <select id="occ"><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+ <p class="hint" id="hint">Clique no mapa para definir a origem e depois o destino.</p>
+ <div id="res"></div>
+ <p class="foot">Rotas por ruas reais (OSRM) e endereços do Nominatim, com mapa © OpenStreetMap. Emissões em g de CO₂ por passageiro·km: carro 171, ônibus 89, bicicleta e caminhada 0 (emissão direta). O trajeto de ônibus usa o caminho do carro (+8% de distância), com tempo estimado em 1,6× o do carro mais 6 min de espera. O tempo do carro inclui +25% de trânsito.</p>
+</aside>
+<div id="map"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const MODES=[
+ {id:'car',n:'Carro',ic:'🚗',e:171,c:'#d93025',p:'car'},
+ {id:'bus',n:'Ônibus',ic:'🚌',e:89,c:'#f29900',p:'car'},
+ {id:'bike',n:'Bicicleta',ic:'🚴',e:0,c:'#1e8e3e',p:'bike'},
+ {id:'walk',n:'Caminhada',ic:'🚶',e:0,c:'#1a73e8',p:'foot'}];
+const $=id=>document.getElementById(id);
+const map=L.map('map').setView([-22.7612,-47.1542],13);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+const layer=L.layerGroup().addTo(map),pins=L.layerGroup().addTo(map);
+let st={o:null,d:null,m:'bike',occ:1,D:null},tok=0;
+
+const fT=m=>m<60?Math.round(m)+' min':Math.floor(m/60)+' h '+Math.round(m%60)+' min';
+const fC=g=>g<1000?Math.round(g).toLocaleString('pt-BR')+' g':(g/1000).toLocaleString('pt-BR',{maximumFractionDigits:2})+' kg';
+const fK=k=>k.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+' km';
+
+async function geocode(q){
+ const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=pt-BR&q='+encodeURIComponent(q));
+ const j=await r.json();
+ if(!j.length)throw new Error('Endereço não encontrado: '+q);
+ return{lat:+j[0].lat,lng:+j[0].lon,n:j[0].display_name.split(',').slice(0,2).join(',')};
+}
+async function route(p,o,d){
+ const u=`https://routing.openstreetmap.de/routed-${p}/route/v1/driving/${o.lng},${o.lat};${d.lng},${d.lat}?overview=full&geometries=geojson`;
+ const j=await(await fetch(u)).json();
+ if(!j.routes||!j.routes[0])throw new Error('Sem rota disponível entre os pontos.');
+ const r=j.routes[0];
+ return{km:r.distance/1000,min:r.duration/60,pts:r.geometry.coordinates.map(c=>[c[1],c[0]])};
+}
+function mk(p,l,c){return L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',html:`<div class="mk" style="background:${c}">${l}</div>`,iconSize:[28,28],iconAnchor:[14,14]})}).addTo(pins)}
+function drawPins(){pins.clearLayers();if(st.o)mk(st.o,'A','#1a73e8');if(st.d)mk(st.d,'B','#d93025')}
+
+async function calc(){
+ if(!st.o||!st.d)return;
+ const t=++tok;$('res').innerHTML='<p class="hint">Calculando rotas…</p>';
+ try{
+  const [car,bike,foot]=await Promise.all(['car','bike','foot'].map(p=>route(p,st.o,st.d)));
+  if(t!==tok)return;
+  const bus={km:car.km*1.08,min:car.min*1.25*1.6+6,pts:car.pts};
+  const T={car:{...car,min:car.min*1.25},bus,bike,walk:foot};
+  st.D=MODES.map(m=>({...m,...T[m.id]}));
+  render(true);
+ }catch(e){if(t===tok)$('res').innerHTML=`<p class="err">${e.message||'Não foi possível calcular as rotas agora.'}</p>`}
+}
+function render(fit){
+ if(!st.D)return;
+ const D=st.D.map(m=>{const e=m.id==='car'?m.e/st.occ:m.e,g=m.km*e;return{...m,g,gpm:g/m.min}});
+ const car=D[0],maxG=Math.max(...D.map(x=>x.g)),maxP=Math.max(...D.map(x=>x.gpm));
+ const best=[...D].sort((a,b)=>a.g-b.g||a.min-b.min)[0];
+ layer.clearLayers();
+ D.filter(m=>m.id!==st.m).forEach(m=>L.polyline(m.pts,{color:m.c,weight:4,opacity:.5,dashArray:'2 8'}).addTo(layer));
+ const cur=D.find(m=>m.id===st.m);
+ L.polyline(cur.pts,{color:'#fff',weight:11,opacity:.9}).addTo(layer);
+ const pl=L.polyline(cur.pts,{color:cur.c,weight:7}).addTo(layer);
+ if(fit)map.fitBounds(pl.getBounds(),{padding:[50,50]});
+ const saved=car.g-best.g,trees=Math.max(1,Math.round(saved/60));
+ let h=`<div class="sum">${best.id==='car'?'Neste trajeto o carro já é a opção de menor emissão. Aumente as pessoas a bordo para reduzir a pegada.':`<b>${best.ic} ${best.n}</b> emite ${fC(best.g)} neste trajeto e evita <b>${fC(saved)}</b> de CO₂ em relação ao carro, o que uma árvore leva cerca de ${trees} ${trees>1?'dias':'dia'} para absorver.`}</div>`;
+ D.forEach(m=>{
+  const r=maxG?m.g/maxG:0,cl=m.g===0?'g':r<.7?'m':'b',dif=car.g-m.g;
+  h+=`<button class="card ${cl} ${m.id===st.m?'sel':''}" data-m="${m.id}">
+   <div class="top"><span class="ic">${m.ic}</span><span class="nm">${m.n}</span>${m.id===best.id?'<span class="badge">Mais sustentável</span>':''}<span class="tm">${fT(m.min)}</span></div>
+   <div class="meta">${fK(m.km)}${m.id==='car'&&st.occ>1?' · dividido por '+st.occ:''}</div>
+   <div class="row"><div><div class="k">CO₂ total do trajeto</div><div class="v">${fC(m.g)}</div><div class="bar"><i style="width:${r*100}%"></i></div></div>
+   <div><div class="k">CO₂ por minuto</div><div class="v">${m.gpm.toLocaleString('pt-BR',{maximumFractionDigits:1})} g/min</div><div class="bar"><i style="width:${maxP?m.gpm/maxP*100:0}%"></i></div></div></div>
+   ${m.id!=='car'&&dif>0?`<div class="save">↓ ${fC(dif)} a menos que o carro</div>`:''}</button>`;
+ });
+ $('res').innerHTML=h;
+ document.querySelectorAll('.card').forEach(c=>c.onclick=()=>{st.m=c.dataset.m;render(false)});
+}
+function reset(){st.D=null;layer.clearLayers();$('res').innerHTML=''}
+function hint(){$('hint').textContent=!st.o?'Clique no mapa para definir a origem.':!st.d?'Agora clique no destino ou digite o endereço.':'Toque em um meio de transporte para destacar a rota no mapa.'}
+
+map.on('click',e=>{
+ const p={lat:e.latlng.lat,lng:e.latlng.lng,n:'Ponto no mapa'};
+ if(!st.o||st.d){st.o=p;st.d=null;$('d').value='';$('o').value='Ponto no mapa';reset()}
+ else{st.d=p;$('d').value='Ponto no mapa';calc()}
+ drawPins();hint();
+});
+$('go').onclick=async()=>{
+ try{
+  $('res').innerHTML='<p class="hint">Buscando endereços…</p>';
+  if($('o').value&&$('o').value!=='Ponto no mapa'&&$('o').value!==(st.o&&st.o.n))st.o=await geocode($('o').value);
+  if($('d').value&&$('d').value!=='Ponto no mapa'&&$('d').value!==(st.d&&st.d.n))st.d=await geocode($('d').value);
+  if(st.o)$('o').value=st.o.n;if(st.d)$('d').value=st.d.n;
+  drawPins();hint();
+  if(!st.o||!st.d){$('res').innerHTML='<p class="err">Informe origem e destino.</p>';return}
+  map.fitBounds(L.latLngBounds([st.o,st.d].map(p=>[p.lat,p.lng])),{padding:[60,60]});
+  calc();
+ }catch(e){$('res').innerHTML=`<p class="err">${e.message}</p>`}
+};
+['o','d'].forEach(i=>$(i).addEventListener('keydown',e=>{if(e.key==='Enter')$('go').click()}));
+$('sw').onclick=()=>{[st.o,st.d]=[st.d,st.o];[$('o').value,$('d').value]=[$('d').value,$('o').value];drawPins();calc()};
+$('occ').onchange=e=>{st.occ=+e.target.value;render(false)};
+$('loc').onclick=()=>navigator.geolocation?navigator.geolocation.getCurrentPosition(p=>{
+ st.o={lat:p.coords.latitude,lng:p.coords.longitude,n:'Minha localização'};$('o').value=st.o.n;
+ map.setView([st.o.lat,st.o.lng],14);drawPins();hint();calc();
+},()=>{$('hint').textContent='Não foi possível acessar sua localização. Verifique a permissão do navegador.'}):0;
+</script>
+</body>
+</html>
