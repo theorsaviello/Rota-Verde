@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rota Verde – compare o CO₂ do seu trajeto</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{--panel:#fff;--ink:#202124;--mute:#5f6368;--line:#e8eaed;--hov:#f1f3f4;--sel:#e8f0fe;--acc:#1a73e8;--good:#188038;--mid:#e37400;--bad:#d93025;--field:#fff;--fb:#dadce0;--sh:0 1px 2px rgba(60,64,67,.3),0 2px 6px 2px rgba(60,64,67,.15);--w:408px}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--panel:#202124;--ink:#e8eaed;--mute:#9aa0a6;--line:#3c4043;--hov:#2d2f33;--sel:#1f3050;--acc:#8ab4f8;--good:#81c995;--mid:#fdd663;--bad:#f28b82;--field:#2d2f33;--fb:#5f6368;--sh:0 1px 3px rgba(0,0,0,.6),0 4px 8px 3px rgba(0,0,0,.4)}
+ .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.95) contrast(.9)}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--panel);color:var(--ink);font:14px/1.45 Roboto,"Segoe UI",system-ui,Arial,sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.app{position:fixed;inset:0}
+#map{position:absolute;inset:0;background:#e5e3df}
+.panel{position:absolute;left:0;top:0;bottom:0;width:var(--w);display:flex;flex-direction:column;background:var(--panel);box-shadow:var(--sh);z-index:1000}
+.search{padding:14px 16px 12px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:var(--good)}
+.brand b{font-size:18px;font-weight:500;color:var(--ink)}
+.brand span{font-size:12px;color:var(--mute);margin-left:auto}
+.tabs{display:flex;margin:0 -8px 10px}
+.tab{flex:1;border:0;background:none;padding:6px 0 4px;color:var(--mute);display:flex;flex-direction:column;align-items:center;gap:1px;border-bottom:3px solid transparent;border-radius:8px 8px 0 0}
+.tab span{font-size:12px}
+.tab:hover{background:var(--hov)}
+.tab.on{color:var(--c);border-bottom-color:var(--c)}
+.io{display:flex;gap:6px;align-items:stretch}
+.rail{width:20px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:15px 0 12px;color:var(--bad)}
+.rail .a{width:10px;height:10px;border:2px solid var(--mute);border-radius:50%}
+.rail .d{flex:1;margin:3px 0;border-left:3px dotted var(--fb)}
+.inputs{flex:1;display:grid;gap:8px;min-width:0}
+.f{position:relative}
+.f input{width:100%;height:42px;padding:0 36px 0 12px;border:1px solid var(--fb);border-radius:8px;background:var(--field);color:var(--ink);font:inherit;font-size:14px}
+.f input:focus{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc);outline:0}
+.x{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--mute);width:32px;height:32px;border-radius:50%;display:grid;place-items:center}
+.x:hover,.sw:hover{background:var(--hov)}
+.sw{border:0;background:none;color:var(--mute);width:36px;border-radius:50%;align-self:center;height:36px;display:grid;place-items:center}
+.sg{position:absolute;left:0;right:0;top:calc(100% + 4px);margin:0;padding:6px 0;list-style:none;background:var(--panel);border-radius:8px;box-shadow:var(--sh);z-index:1200;display:none;max-height:300px;overflow:auto}
+.sg li{display:flex;gap:12px;align-items:center;padding:9px 14px;cursor:pointer}
+.sg li:hover,.sg li:focus{background:var(--hov);outline:0}
+.sg li svg{flex:none;color:var(--mute)}
+.sg b{display:block;font-weight:500}
+.sg small{display:block;color:var(--mute)}
+.sg li.mu{color:var(--mute);cursor:default}
+.go{margin-top:10px;width:100%;height:40px;border:0;border-radius:20px;background:var(--acc);color:#fff;font-weight:500}
+@media (prefers-color-scheme:dark){.go{color:#202124}}
+.go:hover{filter:brightness(1.08)}
+.sheet{flex:1;overflow-y:auto;min-height:0}
+.grip{display:none;width:44px;height:5px;border-radius:3px;border:0;background:var(--fb);margin:8px auto}
+details{border-bottom:1px solid var(--line)}
+summary{list-style:none;display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;font-weight:500}
+summary::-webkit-details-marker{display:none}
+summary .ch{margin-left:auto;transition:transform .2s;color:var(--mute)}
+details[open] summary .ch{transform:rotate(180deg)}
+summary:hover{background:var(--hov)}
+.vp{display:grid;grid-template-columns:130px 1fr;gap:10px 12px;align-items:center;padding:4px 16px 16px;font-size:13px;color:var(--mute)}
+.vp input,.vp select{width:100%;height:36px;padding:0 10px;border:1px solid var(--fb);border-radius:8px;background:var(--field);color:var(--ink);font:inherit}
+.vp .k{grid-column:1/3;font-size:12px;color:var(--mute);margin-top:-4px}
+.hint{margin:0;padding:10px 16px;color:var(--mute);font-size:12.5px}
+.sum{display:flex;gap:12px;margin:12px 16px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--good) 13%,transparent);color:var(--ink);line-height:1.4}
+.sum svg{flex:none;color:var(--good);margin-top:1px}
+.sum b{color:var(--good)}
+.card{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:14px 16px;position:relative}
+.card:hover{background:var(--hov)}
+.card.sel{background:var(--sel);box-shadow:inset 4px 0 0 var(--c)}
+.r1{display:flex;align-items:center;gap:12px}
+.ci{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff}
+.tt{flex:1;min-width:0}
+.nm{font-weight:500;font-size:15px}
+.sub{color:var(--mute);font-size:12.5px}
+.tm{font-size:19px;font-weight:500;white-space:nowrap}
+.best{display:inline-flex;align-items:center;gap:4px;background:var(--good);color:#fff;font-size:11.5px;font-weight:500;padding:1px 8px 1px 6px;border-radius:10px;margin-left:6px;vertical-align:1px}
+@media (prefers-color-scheme:dark){.best{color:#202124}}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin:10px 0 0 52px}
+.k2{font-size:12px;color:var(--mute)}
+.v2{font-size:16px;font-weight:500}
+.bar{grid-column:span 1;height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:3px}
+.bar i{display:block;height:100%;border-radius:3px;transition:width .5s}
+.g .bar i{background:var(--good)}.m .bar i{background:var(--mid)}.b .bar i{background:var(--bad)}
+.lvl{display:inline-block;font-size:12px;font-weight:500;padding:1px 8px;border-radius:10px;margin:10px 0 0 52px}
+.lvl.g{background:color-mix(in srgb,var(--good) 16%,transparent);color:var(--good)}
+.lvl.m{background:color-mix(in srgb,var(--mid) 18%,transparent);color:var(--mid)}
+.lvl.b{background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)}
+.save{display:inline-block;margin-left:8px;font-size:12.5px;color:var(--good)}
+.empty{padding:28px 24px;text-align:center;color:var(--mute)}
+.empty svg{color:var(--good);margin-bottom:8px}
+.empty b{display:block;color:var(--ink);font-size:16px;font-weight:500;margin-bottom:4px}
+.sk{height:96px;margin:10px 16px;border-radius:10px;background:linear-gradient(90deg,var(--hov) 25%,var(--line) 50%,var(--hov) 75%);background-size:200% 100%;animation:sh 1.2s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+.err{margin:16px;color:var(--bad)}
+.foot{margin:0;padding:14px 16px 20px;font-size:11.5px;color:var(--mute)}
+.fab{position:absolute;right:10px;bottom:118px;z-index:900;width:40px;height:40px;border:0;border-radius:50%;background:var(--panel);color:var(--mute);box-shadow:var(--sh);display:grid;place-items:center}
+.fab:hover{color:var(--acc)}
+.leaflet-control-zoom{border:0!important;box-shadow:var(--sh)!important;border-radius:8px!important;overflow:hidden}
+.leaflet-control-zoom a{background:var(--panel)!important;color:var(--ink)!important;border:0!important;width:40px!important;height:40px!important;line-height:40px!important;font-size:20px}
+.leaflet-control-zoom a:first-child{border-bottom:1px solid var(--line)!important}
+.leaflet-popup-content-wrapper{border-radius:8px;background:var(--panel);color:var(--ink)}
+.leaflet-popup-tip{background:var(--panel)}
+.leaflet-popup-content{margin:6px}
+.pp{display:grid;min-width:160px}
+.pp button{border:0;background:none;text-align:left;padding:9px 10px;border-radius:6px}
+.pp button:hover{background:var(--hov)}
+.pa{width:22px;height:22px;border-radius:50%;background:#1a73e8;border:4px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.5);cursor:grab}
+.pb{color:#d93025;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5));cursor:grab}
+.rl{position:absolute;transform:translate(-50%,-50%);display:flex;gap:5px;align-items:center;white-space:nowrap;background:#fff;color:#3c4043;border-radius:14px;padding:3px 9px 3px 7px;font-size:12.5px;font-weight:500;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer;border:2px solid transparent}
+.rl svg{color:var(--c)}
+.rl.on{background:var(--c);color:#fff;border-color:#fff}
+.rl.on svg{color:#fff}
+@media (max-width:760px){
+ .panel{display:contents}
+ .search{position:absolute;top:8px;left:8px;right:8px;z-index:1000;background:var(--panel);border:0;border-radius:14px;box-shadow:var(--sh);padding:8px 12px 12px}
+ .brand{display:none}
+ .sheet{position:absolute;left:0;right:0;bottom:0;max-height:46vh;background:var(--panel);border-radius:16px 16px 0 0;box-shadow:0 -2px 10px rgba(0,0,0,.25);z-index:1000;transition:max-height .25s;padding-bottom:env(safe-area-inset-bottom,0px)}
+ .sheet.min{max-height:44px;overflow:hidden}
+ .grip{display:block}
+ .leaflet-control-zoom{display:none}
+ .fab{bottom:calc(46vh + 12px)}
+ .vp{grid-template-columns:110px 1fr}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+ <div id="map"></div>
+ <button class="fab" id="loc" title="Minha localização" aria-label="Usar minha localização"></button>
+ <div class="panel">
+  <div class="search">
+   <div class="brand"><span id="leaf"></span><b>Rota Verde</b><span>CO₂ por trajeto</span></div>
+   <div class="tabs" id="tabs" role="tablist" aria-label="Meio de transporte"></div>
+   <div class="io">
+    <div class="rail"><i class="a"></i><i class="d"></i><span id="railb"></span></div>
+    <div class="inputs">
+     <div class="f"><input id="o" placeholder="Escolha a origem" aria-label="Origem" autocomplete="off"><button class="x" id="x-o" aria-label="Limpar origem"></button><ul class="sg" id="sg-o"></ul></div>
+     <div class="f"><input id="d" placeholder="Escolha o destino" aria-label="Destino" autocomplete="off"><button class="x" id="x-d" aria-label="Limpar destino"></button><ul class="sg" id="sg-d"></ul></div>
+    </div>
+    <button class="sw" id="sw" title="Inverter origem e destino" aria-label="Inverter origem e destino"></button>
+   </div>
+   <button class="go" id="go">Traçar rotas</button>
+  </div>
+  <div class="sheet" id="sheet">
+   <button class="grip" id="grip" aria-label="Expandir ou recolher resultados"></button>
+   <details>
+    <summary><span id="vico"></span>Meu veículo<span class="ch" id="chev"></span></summary>
+    <div class="vp">
+     <label for="mdl">Modelo do carro</label><input id="mdl" list="mlist" placeholder="Ex.: BYD Dolphin Mini" autocomplete="off"><datalist id="mlist"></datalist>
+     <label for="fuel" id="fl" hidden>Combustível</label><select id="fuel" hidden><option value="g">Gasolina</option><option value="e">Etanol</option></select>
+     <div id="minfo" class="k"></div>
+     <label for="v-car">Se não achar o modelo</label><select id="v-car"></select>
+     <label for="occ">Pessoas no carro</label><select id="occ"><option>1</option><option>2</option><option>3</option><option>4</option></select>
+     <label for="v-bus">Ônibus</label><select id="v-bus"></select>
+     <label for="v-bike">Bicicleta</label><select id="v-bike"></select>
+    </div>
+   </details>
+   <p class="hint" id="hint"></p>
+   <div id="res"></div>
+   <p class="foot">Rotas por ruas reais (OSRM), endereços do Nominatim e mapa © OpenStreetMap. Carros: dados da Tabela PBEV 2026 do Inmetro (CO₂ fóssil no escapamento, em g/km, atualização de 27/02/2026). Nos elétricos, o consumo em MJ/km é dividido por 3,6 e multiplicado por 38,5 g de CO₂/kWh (média anual 2023 da rede elétrica, MCTI). As médias por tipo usam só os modelos da lista. Moto (90 g/km), ônibus a diesel (89 g/km por passageiro), ônibus elétrico (8) e bicicleta elétrica (4) são estimativas. O ônibus usa o caminho do carro (+8% de distância), com tempo de 2× o do carro mais 6 min de espera. O tempo do carro inclui +25% de trânsito. Confira fontes oficiais antes de usar em trabalhos.</p>
+  </div>
+ </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+/* Fonte: Inmetro, Tabela PBEV 2026 (atualização de 27/02/2026).
+   F=flex, G=gasolina, HF=híbrido flex, HG=híbrido gasolina: valor = CO2 fóssil no escapamento (g/km, gasolina).
+   E=elétrico: valor = consumo energético (MJ/km). */
+const GRID=38.5; // g CO2/kWh, média anual 2023 da rede elétrica (MCTI)
+const DB=[
+['Fiat Mobi Like 1.0','F',87],['Fiat Argo Drive 1.0 (manual)','F',94],['Fiat Argo Drive 1.3 (automático)','F',99],['Fiat Cronos Drive 1.3 (manual)','F',92],
+['Fiat Pulse Drive 1.3 (manual)','F',98],['Fiat Pulse Audace Hybrid 1.0 Turbo','HF',95],['Fiat Fastback Turbo 200 1.0','F',102],['Fiat Strada Freedom CD 1.3','F',98],['Fiat Toro Freedom 1.3 Turbo (automático)','F',136],
+['VW Polo MPI 1.0','F',92],['VW Polo Highline TSI 1.0 (automático)','F',97],['VW Virtus TSI 1.0 (manual)','F',93],['VW Virtus Highline 200 TSI (automático)','F',101],['VW T-Cross 200 TSI (automático)','F',102],
+['VW Nivus Highline 200 TSI (automático)','F',99],['VW Tera TSI 1.0 (manual)','F',97],['VW Taos Highline 250 TSI','F',112],['VW Saveiro Trendline 1.6 (cabine simples)','F',112],
+['Chevrolet Onix 1.0 (manual)','F',90],['Chevrolet Onix LT 1.0 Turbo (automático)','F',99],['Chevrolet Onix Plus 1.0 (manual)','F',87],['Chevrolet Tracker LT 1.0 Turbo','F',108],['Chevrolet Montana LT 1.2 Turbo (manual)','F',102],['Chevrolet Spin LT 1.8 (manual)','F',115],
+['Hyundai HB20 Comfort 1.0','F',93],['Hyundai HB20 Limited 1.0 Turbo (automático)','F',95],['Hyundai HB20S Comfort 1.0','F',92],['Hyundai Creta Comfort 1.0 Turbo','F',108],['Hyundai Kona Ultimate Híbrido 1.6','HG',74],
+['Renault Kwid Zen 1.0','F',88],['Renault Kardian Evo 1.0 (manual)','F',98],['Renault Duster Iconic 1.3 TCe (CVT)','F',117],['Renault Boreal Evo 1.3','F',110],
+['Toyota Corolla Altis 2.0','F',104],['Toyota Corolla Altis Híbrido 1.8','HF',79],['Toyota Corolla Cross XR 2.0','F',110],['Toyota Corolla Cross XRV Híbrido 1.8','HF',85],['Toyota Yaris Cross XR Flex 1.5','F',100],['Toyota Yaris Cross XRX Híbrido 1.5','HF',77],
+['Honda City LX 1.5','F',95],['Honda HR-V EX 1.5','F',101],['Honda HR-V Advance 1.5 Turbo (modelo 2026)','F',111],['Honda WR-V EX 1.5','F',108],['Honda Civic Hybrid Touring 2.0','HG',75],['Honda CR-V Touring Híbrido 2.0','HG',102],
+['Jeep Renegade Sport 1.3 Turbo','F',115],['Jeep Compass Sport 1.3 Turbo','F',124],['Jeep Commander Limited 7 lugares 1.3 Turbo','F',127],
+['Nissan Kicks Sense 1.0 (automático)','F',105],['Nissan Versa Sense 1.6 (CVT)','F',104],['Nissan Kait Sense 1.6','F',109],['Nissan Sentra SEN 2.0 (CVT)','G',110],
+['Peugeot 208 Active 1.0 (manual)','F',92],['Peugeot 2008 Active T200 1.0 Turbo','F',103],['Citroën C3 Live 1.0','F',96],['Citroën Basalt Feel 1.0','F',97],
+['Caoa Chery Tiggo 5X Pro 1.5 Turbo','F',126],['GWM Haval H6 HEV2 (modelo 2026)','HG',100],['Kia Sportage Híbrido EX 1.6','HG',103],['Kia Niro Híbrido EX 1.6','HG',75],['Ford Territory Titanium 1.5','G',139],
+['BYD Dolphin Mini GS EV','E',.41],['BYD Dolphin Mini GL5 EV','E',.39],['BYD Dolphin GS 180EV','E',.42],['BYD Dolphin Plus 310EV','E',.51],['BYD Yuan Plus GL310 EV','E',.56],['BYD Yuan Pro GS 290EV','E',.51],
+['BYD Seal AWD GS 590EV','E',.62],['BYD Han AWD GS 680EV','E',.69],['BYD Tan AWD GS 700EV','E',.73],['Renault E-Kwid Intens','E',.44],['Fiat 500e Icon','E',.46],
+['Geely EX2 Max','E',.39],['Geely EX5 Pro','E',.42],['Geely EX5 Max','E',.51],['GWM Ora 03 Skin BEV48','E',.52],['GWM Ora 03 GT BEV63','E',.54],['MG MG4 64 kWh Comfort','E',.50],['MG S5 EV 62 kWh','E',.51],
+['GAC Aion ES Plus','E',.45],['GAC Aion Y Elite','E',.57],['Volvo EX30 E40 Core','E',.55],['Mini Cooper E','E',.46],['Hyundai Ioniq 5 Platinum','E',.66],['Chevrolet Spark EUV Activ','E',.50],
+['Chevrolet Equinox EV','E',.56],['JAC e-JS1','E',.50],['Peugeot E-208 GT','E',.59],['Kia EV5 Air','E',.60],['Leapmotor C10 Design','E',.61],['Omoda E5','E',.51]];
+const gKm=(r,fuel)=>r[1]==='E'?r[2]/3.6*GRID:(fuel==='e'&&(r[1]==='F'||r[1]==='HF'))?0:r[2];
+const avg=f=>{const a=DB.filter(f).map(r=>gKm(r));return a.reduce((s,x)=>s+x,0)/a.length};
+
+const VAR={car:[['Média dos flex/gasolina',avg(r=>r[1]==='F'||r[1]==='G')],['Média dos híbridos',avg(r=>r[1][0]==='H')],['Média dos elétricos',avg(r=>r[1]==='E')]],bus:[['Diesel',89],['Elétrico',8]],bike:[['Comum',0,1],['Elétrica',4,.75]]};
+const MODES=[
+ {id:'car',n:'Carro',c:'#d93025'},{id:'moto',n:'Moto',c:'#8e24aa'},
+ {id:'bus',n:'Ônibus',c:'#e37400'},{id:'bike',n:'Bicicleta',c:'#188038'},{id:'walk',n:'Caminhada',c:'#1a73e8'}];
+
+/* ---------- ícones ---------- */
+const P={
+ car:'M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z',
+ bus:'M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z',
+ bike:'M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5zM10.8 10.5l2.4-2.4.8.8c1.3 1.3 3 2.1 5.1 2.1V9c-1.5 0-2.7-.6-3.6-1.5l-1.9-1.9c-.5-.4-1-.6-1.6-.6s-1.1.2-1.4.6L7.8 8.4c-.4.4-.6.9-.6 1.4 0 .6.2 1.1.6 1.4L11 14v5h2v-6.2l-2.2-2.3zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z',
+ walk:'M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7',
+ leaf:'M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.3c.48.17.98.3 1.34.3C19 20 22 3 22 3c-1 2-8 2.25-13 3.25S2 11.5 2 13.5s1.75 3.75 1.75 3.75C7 8 17 8 17 8z',
+ pin:'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
+ swap:'M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z',
+ x:'M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
+ loc:'M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z',
+ chev:'M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z'};
+const ico=(id,s=22)=>id==='moto'
+ ?`<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="16.5" r="3"/><circle cx="18.5" cy="16.5" r="3"/><path d="M8.5 16.5h4l3-6h-5M15.5 10.5l3 6M13 7h3"/></svg>`
+ :`<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="currentColor" aria-hidden="true"><path d="${P[id]}"/></svg>`;
+$('leaf').innerHTML=ico('leaf',22);$('loc').innerHTML=ico('loc',22);$('vico').innerHTML=ico('car',20);$('chev').innerHTML=ico('chev',24);
+$('sw').innerHTML=ico('swap',22);$('railb').innerHTML=ico('pin',20);
+$('x-o').innerHTML=$('x-d').innerHTML=ico('x',18);
+$('grip').onclick=()=>$('sheet').classList.toggle('min');
+
+const map=L.map('map',{zoomControl:false}).setView([-22.7612,-47.1542],13);
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+const layer=L.layerGroup().addTo(map),pins=L.layerGroup().addTo(map);
+const mob=()=>matchMedia('(max-width:760px)').matches;
+const pad=()=>mob()?{paddingTopLeft:[30,250],paddingBottomRight:[30,Math.round(innerHeight*.5)]}:{paddingTopLeft:[450,60],paddingBottomRight:[70,60]};
+const focusOn=(p,z)=>{map.setView([p.lat,p.lng],z,{animate:false});map.panBy(mob()?[0,60]:[-210,0],{animate:false})};
+focusOn({lat:-22.7612,lng:-47.1542},13);
+let st={o:null,d:null,m:'bike',occ:1,D:null,model:null,fuel:'g',v:{car:0,bus:0,bike:0}},tok=0,SR={};
+
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fT=m=>m<60?Math.round(m)+' min':Math.floor(m/60)+' h '+Math.round(m%60)+' min';
+const fTs=m=>m<60?Math.round(m)+' min':Math.floor(m/60)+' h '+String(Math.round(m%60)).padStart(2,'0');
+const fC=g=>g<1000?Math.round(g).toLocaleString('pt-BR')+' g':(g/1000).toLocaleString('pt-BR',{maximumFractionDigits:2})+' kg';
+const fK=k=>k.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+' km';
+const fLL=p=>p.lat.toFixed(5)+', '+p.lng.toFixed(5);
+
+/* ---------- abas ---------- */
+$('tabs').innerHTML=MODES.map(m=>`<button class="tab" role="tab" data-m="${m.id}" aria-label="${m.n}" style="--c:${m.c}">${ico(m.id)}<span id="t-${m.id}">–</span></button>`).join('');
+function markTabs(){document.querySelectorAll('.tab').forEach(b=>{const on=b.dataset.m===st.m;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)})}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{st.m=b.dataset.m;st.D?render(false):markTabs()});
+
+/* ---------- veículo ---------- */
+for(const k in VAR){
+ $('v-'+k).innerHTML=VAR[k].map((v,i)=>`<option value="${i}">${v[0]}</option>`).join('');
+ $('v-'+k).onchange=e=>{st.v[k]=+e.target.value;render(false)};
+}
+$('occ').onchange=e=>{st.occ=+e.target.value;render(false)};
+$('mlist').innerHTML=DB.map(r=>`<option value="${r[0]}">`).join('');
+function setModel(){
+ const q=$('mdl').value.trim().toLowerCase(),r=DB.find(x=>x[0].toLowerCase()===q)||null;
+ st.model=r;
+ const flex=r&&(r[1]==='F'||r[1]==='HF');
+ $('fuel').hidden=$('fl').hidden=!flex;
+ $('v-car').disabled=!!r;
+ let t='';
+ if(r){
+  const g=gKm(r,st.fuel).toLocaleString('pt-BR',{maximumFractionDigits:1});
+  t=r[1]==='E'?`Inmetro (PBEV 2026): ${r[2].toLocaleString('pt-BR')} MJ/km ÷ 3,6 = ${(r[2]/3.6).toLocaleString('pt-BR',{maximumFractionDigits:3})} kWh/km × ${GRID.toLocaleString('pt-BR')} g/kWh da rede = ${g} g de CO₂/km.`
+   :st.fuel==='e'&&flex?'Inmetro (PBEV 2026): 0 g/km de CO₂ fóssil com etanol. O CO₂ emitido é reabsorvido pela cana e o ciclo de vida não entra na conta.'
+   :`Inmetro (PBEV 2026): ${g} g/km de CO₂ fóssil no escapamento.`;
+ }else if(q)t='Escolha um modelo da lista de sugestões para usar o dado oficial.';
+ $('minfo').textContent=t;
+ render(false);
+}
+$('mdl').oninput=setModel;
+$('fuel').onchange=e=>{st.fuel=e.target.value;setModel()};
+
+/* ---------- pontos ---------- */
+const EMPTY=`<div class="empty">${ico('leaf',40)}<b>Para onde você vai?</b>Busque endereços ou toque no mapa. Vamos comparar o CO₂ de cada meio de transporte no seu trajeto.</div>`;
+function hint(){$('hint').textContent=!st.o&&!st.d?'Toque no mapa para escolher "Partir daqui" ou "Chegar aqui".':!st.o?'Falta a origem.':!st.d?'Falta o destino.':'Arraste os pontos A e B no mapa para ajustar a rota.'}
+function closeSg(){document.querySelectorAll('.sg').forEach(u=>u.style.display='none')}
+function sg(k,h){const u=$('sg-'+k);u.innerHTML=h;u.style.display='block'}
+function reset(){
+ st.D=null;layer.clearLayers();$('res').innerHTML=EMPTY;
+ MODES.forEach(m=>$('t-'+m.id).textContent='–');markTabs();
+}
+async function revName(k){
+ const p=st[k];if(!p)return;
+ try{
+  const j=await(await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&accept-language=pt-BR&zoom=18&lat=${p.lat}&lon=${p.lng}`)).json();
+  if(st[k]===p&&j.display_name){p.n=j.display_name.split(',').slice(0,3).join(',');$(k).value=p.n}
+ }catch(e){}
+}
+function mk(k){
+ const p=st[k];
+ const icon=k==='o'?L.divIcon({className:'',html:'<div class="pa"></div>',iconSize:[22,22],iconAnchor:[11,11]})
+  :L.divIcon({className:'',html:`<div class="pb">${ico('pin',40)}</div>`,iconSize:[40,40],iconAnchor:[20,38]});
+ const m=L.marker([p.lat,p.lng],{draggable:true,title:'Arraste para ajustar',icon}).addTo(pins);
+ m.on('dragend',()=>{const q=m.getLatLng();st[k]={lat:q.lat,lng:q.lng,n:fLL(q)};$(k).value=st[k].n;revName(k);calc()});
+}
+function drawPins(){pins.clearLayers();if(st.o)mk('o');if(st.d)mk('d')}
+function setPoint(k,p,fit){
+ st[k]=p;$(k).value=p.n;closeSg();drawPins();hint();
+ if(st.o&&st.d){if(fit)map.fitBounds(L.latLngBounds([st.o,st.d].map(q=>[q.lat,q.lng])),pad());calc()}
+ else{reset();if(fit)focusOn(p,Math.max(map.getZoom(),15))}
+}
+window.pick=(k,lat,lng)=>{map.closePopup();setPoint(k,{lat,lng,n:fLL({lat,lng})},false);revName(k)};
+map.on('click',e=>{
+ closeSg();const{lat,lng}=e.latlng;
+ L.popup({closeButton:false,offset:[0,-2]}).setLatLng(e.latlng).setContent(`<div class="pp"><button onclick="pick('o',${lat},${lng})">Partir daqui</button><button onclick="pick('d',${lat},${lng})">Chegar aqui</button></div>`).openOn(map);
+});
+async function search(k){
+ const q=$(k).value.trim();if(!q)return;
+ sg(k,'<li class="mu">Buscando…</li>');
+ try{
+  const b=map.getBounds();
+  const j=await(await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&accept-language=pt-BR&viewbox=${b.getWest()},${b.getNorth()},${b.getEast()},${b.getSouth()}&q=${encodeURIComponent(q)}`)).json();
+  if(!j.length){sg(k,'<li class="mu">Nenhum resultado. Tente incluir a cidade.</li>');return}
+  SR[k]=j.map(r=>({lat:+r.lat,lng:+r.lon,parts:r.display_name.split(',').map(s=>s.trim())}));
+  sg(k,SR[k].map((r,i)=>`<li tabindex="0" data-i="${i}">${ico('pin',22)}<span><b>${esc(r.parts.slice(0,2).join(', '))}</b><small>${esc(r.parts.slice(2,5).join(', '))}</small></span></li>`).join(''));
+  $('sg-'+k).querySelectorAll('li').forEach(li=>{const f=()=>choose(k,+li.dataset.i);li.onclick=f;li.onkeydown=e=>{if(e.key==='Enter')f()}});
+ }catch(e){sg(k,'<li class="mu">Falha na busca. Verifique a conexão.</li>')}
+}
+function choose(k,i){
+ const r=SR[k][i],o=k==='o'?'d':'o';
+ setPoint(k,{lat:r.lat,lng:r.lng,n:r.parts.slice(0,2).join(', ')},true);
+ if(!st[o]&&$(o).value.trim())setTimeout(()=>search(o),1100);
+}
+['o','d'].forEach(k=>{
+ $(k).addEventListener('keydown',e=>{if(e.key==='Enter')search(k);if(e.key==='Escape')closeSg()});
+ $('x-'+k).onclick=()=>{st[k]=null;$(k).value='';closeSg();reset();drawPins();hint();$(k).focus()};
+});
+$('o').addEventListener('focus',()=>{
+ if($('o').value)return;
+ sg('o',`<li tabindex="0" id="useloc">${ico('loc',22)}<span><b>Sua localização</b><small>Usar o GPS do dispositivo</small></span></li>`);
+ $('useloc').onclick=()=>$('loc').click();
+});
+document.addEventListener('click',e=>{if(!e.target.closest('.f'))closeSg()});
+$('go').onclick=()=>{
+ if(st.o&&st.d){map.fitBounds(L.latLngBounds([st.o,st.d].map(q=>[q.lat,q.lng])),pad());return calc()}
+ const k=!st.o&&$('o').value.trim()?'o':!st.d&&$('d').value.trim()?'d':null;
+ k?search(k):hint();
+};
+$('sw').onclick=()=>{[st.o,st.d]=[st.d,st.o];[$('o').value,$('d').value]=[$('d').value,$('o').value];drawPins();st.o&&st.d?calc():reset()};
+$('loc').onclick=()=>navigator.geolocation?navigator.geolocation.getCurrentPosition(
+ p=>setPoint('o',{lat:p.coords.latitude,lng:p.coords.longitude,n:'Minha localização'},true),
+ ()=>{$('hint').textContent='Não foi possível acessar sua localização. Verifique a permissão do navegador.'}):0;
+
+/* ---------- rotas e emissões ---------- */
+async function route(p,o,d){
+ const j=await(await fetch(`https://routing.openstreetmap.de/routed-${p}/route/v1/driving/${o.lng},${o.lat};${d.lng},${d.lat}?overview=full&geometries=geojson`)).json();
+ if(!j.routes||!j.routes[0])throw new Error('Sem rota disponível entre os pontos.');
+ const r=j.routes[0];
+ return{km:r.distance/1000,min:r.duration/60,pts:r.geometry.coordinates.map(c=>[c[1],c[0]])};
+}
+async function calc(){
+ if(!st.o||!st.d)return;
+ const t=++tok;$('res').innerHTML='<div class="sk"></div><div class="sk"></div><div class="sk"></div>';
+ $('sheet').classList.remove('min');
+ try{
+  const [car,bike,foot]=await Promise.all(['car','bike','foot'].map(p=>route(p,st.o,st.d)));
+  if(t!==tok)return;
+  const T={car:{...car,min:car.min*1.25},moto:{...car,min:car.min*1.05},bus:{km:car.km*1.08,min:car.min*2+6,pts:car.pts},bike,walk:foot};
+  st.D=MODES.map(m=>({...m,...T[m.id]}));
+  render(true);
+ }catch(e){if(t===tok)$('res').innerHTML=`<p class="err">${esc(e.message||'Não foi possível calcular as rotas agora.')}</p>`}
+}
+function render(fit){
+ markTabs();
+ if(!st.D)return;
+ const D=st.D.map(m=>{
+  let e=m.id==='moto'?90:0,tf=1,lab='';
+  if(VAR[m.id]){const v=VAR[m.id][st.v[m.id]];e=v[1];tf=v[2]||1;lab=v[0]}
+  if(m.id==='car'&&st.model){e=gKm(st.model,st.fuel);lab=st.model[0]+((st.model[1]==='F'||st.model[1]==='HF')?(st.fuel==='e'?' (etanol)':' (gasolina)'):'')}
+  if(m.id==='car')e/=st.occ;
+  const min=m.min*tf,g=m.km*e;
+  return{...m,min,g,gpm:g/min,lab};
+ });
+ D.forEach(m=>$('t-'+m.id).textContent=fTs(m.min));
+ const car=D[0],maxG=Math.max(...D.map(x=>x.g)),maxP=Math.max(...D.map(x=>x.gpm));
+ const sorted=[...D].sort((a,b)=>a.g-b.g||a.min-b.min),best=sorted[0];
+ layer.clearLayers();
+ D.filter(m=>m.id!==st.m).forEach(m=>L.polyline(m.pts,{color:m.c,weight:5,opacity:.55,dashArray:'1 9',lineCap:'round'}).addTo(layer));
+ const cur=D.find(m=>m.id===st.m);
+ L.polyline(cur.pts,{color:'#fff',weight:12,opacity:.95}).addTo(layer);
+ const pl=L.polyline(cur.pts,{color:cur.c,weight:7}).addTo(layer);
+ D.forEach((m,i)=>{
+  const p=m.pts[Math.min(m.pts.length-1,Math.floor(m.pts.length*(.25+.13*i)))];
+  L.marker(p,{keyboard:false,icon:L.divIcon({className:'',iconSize:[0,0],html:`<div class="rl ${m.id===st.m?'on':''}" style="--c:${m.c}">${ico(m.id,16)}${fTs(m.min)}</div>`})}).addTo(layer).on('click',()=>{st.m=m.id;render(false)});
+ });
+ if(fit)map.fitBounds(pl.getBounds(),pad());
+ const saved=car.g-best.g,trees=Math.max(1,Math.round(saved/60));
+ let h=`<div class="sum">${ico('leaf',24)}<div>${best.id==='car'?'Neste trajeto o carro escolhido já é a opção de menor emissão. Aumente as pessoas a bordo para reduzir a pegada.':`<b>${best.n}${best.lab?' ('+esc(best.lab.toLowerCase())+')':''}</b> emite ${fC(best.g)} neste trajeto e evita <b>${fC(saved)}</b> de CO₂ em relação ao carro, o que uma árvore leva cerca de ${trees} ${trees>1?'dias':'dia'} para absorver.`}</div></div>`;
+ sorted.forEach(m=>{
+  const r=maxG?m.g/maxG:0,cl=m.g===0?'g':r<.35?'g':r<.7?'m':'b',lv=m.g===0?'Emissão zero':r<.35?'Emissão baixa':r<.7?'Emissão média':'Emissão alta',dif=car.g-m.g;
+  h+=`<button class="card ${cl} ${m.id===st.m?'sel':''}" data-m="${m.id}" style="--c:${m.c}">
+   <div class="r1"><span class="ci" style="background:${m.c}">${ico(m.id,22)}</span>
+    <div class="tt"><div class="nm">${m.n}${m.id===best.id?`<span class="best">${ico('leaf',13)}Mais sustentável</span>`:''}</div>
+    <div class="sub">${fK(m.km)}${m.lab?' · '+esc(m.lab):''}${m.id==='car'&&st.occ>1?' · dividido por '+st.occ:''}</div></div>
+    <div class="tm">${fT(m.min)}</div></div>
+   <div class="r2"><div><div class="k2">CO₂ total do trajeto</div><div class="v2">${fC(m.g)}</div><div class="bar"><i style="width:${r*100}%"></i></div></div>
+   <div><div class="k2">CO₂ por minuto</div><div class="v2">${m.gpm.toLocaleString('pt-BR',{maximumFractionDigits:1})} g/min</div><div class="bar"><i style="width:${maxP?m.gpm/maxP*100:0}%"></i></div></div></div>
+   <span class="lvl ${cl}">${lv}</span>${m.id!=='car'&&dif>0?`<span class="save">↓ ${fC(dif)} a menos que o carro</span>`:''}</button>`;
+ });
+ $('res').innerHTML=h;
+ document.querySelectorAll('.card').forEach(c=>c.onclick=()=>{st.m=c.dataset.m;render(false)});
+}
+reset();hint();
+</script>
+</body>
+</html>
